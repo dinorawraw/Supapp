@@ -6,6 +6,7 @@
     <title>Entrar</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c] flex items-center justify-center p-4">
     <div id="app" class="w-full max-w-md">
@@ -22,10 +23,10 @@
             
             <form @submit.prevent="handleLogin" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Usuário</label>
+                    <label class="block text-sm font-medium text-gray-700">E-mail</label>
                     <input 
-                        type="text" 
-                        v-model="username" 
+                        type="email" 
+                        v-model="email" 
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     >
@@ -71,12 +72,18 @@
     </div>
 
     <script>
-        const { createApp } = Vue
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
+            'https://odjgklouyfsqhvxvmvdx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
+        );
+
+        const { createApp } = Vue;
 
         createApp({
             data() {
                 return {
-                    username: '',
+                    email: '',
                     password: '',
                     error: '',
                     loading: false
@@ -95,35 +102,53 @@
 
                     try {
                         // Check for admin login
-                        if (this.username === 'Admindino' && this.password === 'dino24413') {
+                        if (this.email === 'admin@dino.com' && this.password === 'dino24413') {
+                            const { data: { user }, error } = await supabaseClient.auth.signUp({
+                                email: this.email,
+                                password: this.password,
+                                options: {
+                                    data: {
+                                        username: 'Admindino',
+                                        name: 'Admin',
+                                        role: 'admin'
+                                    }
+                                }
+                            });
+
+                            if (error) throw error;
+
                             localStorage.setItem('isLoggedIn', 'true');
                             localStorage.setItem('currentUser', JSON.stringify({
-                                username: this.username,
+                                username: 'Admindino',
                                 role: 'admin'
                             }));
                             window.location.href = '/admin-panel.html';
                             return;
                         }
 
-                        // Check regular users
-                        const users = JSON.parse(localStorage.getItem('users') || '[]');
-                        const user = users.find(u => 
-                            u.username === this.username && u.password === this.password
-                        );
+                        // Regular user login
+                        const { data: { user }, error } = await supabaseClient.auth.signInWithPassword({
+                            email: this.email,
+                            password: this.password
+                        });
 
-                        if (user) {
-                            localStorage.setItem('isLoggedIn', 'true');
-                            localStorage.setItem('currentUser', JSON.stringify({
-                                ...user,
-                                role: 'user'
-                            }));
-                            window.location.href = '/home.html';
-                        } else {
-                            this.error = 'Usuário ou senha inválidos';
-                        }
+                        if (error) throw error;
+
+                        const { data: profile } = await supabaseClient
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', user.id)
+                            .single();
+
+                        localStorage.setItem('isLoggedIn', 'true');
+                        localStorage.setItem('currentUser', JSON.stringify({
+                            ...profile,
+                            role: 'user'
+                        }));
+                        window.location.href = '/home.html';
                     } catch (error) {
-                        this.error = 'Ocorreu um erro. Por favor, tente novamente.';
                         console.error('Erro de login:', error);
+                        this.error = 'E-mail ou senha inválidos';
                     } finally {
                         this.loading = false;
                     }

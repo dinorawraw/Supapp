@@ -6,6 +6,7 @@
     <title>Painel Administrativo</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
     <div id="app" class="container mx-auto px-4 py-8">
@@ -150,91 +151,6 @@
                             <video class="h-20 w-auto object-cover rounded" controls>
                                 <source :src="post.video" type="video/mp4">
                             </video>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Add/Edit News Modal -->
-        <div v-if="showAddNewsModal || showEditNewsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <h3 class="text-lg font-bold mb-4">{{ showEditNewsModal ? 'Editar Notícia' : 'Nova Notícia' }}</h3>
-                
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- Form -->
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
-                            <input 
-                                type="text" 
-                                v-model="newsForm.title"
-                                class="w-full p-2 border rounded-lg"
-                            >
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Conteúdo</label>
-                            <textarea 
-                                v-model="newsForm.content"
-                                rows="6"
-                                class="w-full p-2 border rounded-lg"
-                            ></textarea>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">URL da Imagem</label>
-                            <input 
-                                type="url" 
-                                v-model="newsForm.image"
-                                placeholder="https://exemplo.com/imagem.jpg"
-                                class="w-full p-2 border rounded-lg"
-                            >
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">URL do Vídeo</label>
-                            <input 
-                                type="url" 
-                                v-model="newsForm.video"
-                                placeholder="https://exemplo.com/video.mp4"
-                                class="w-full p-2 border rounded-lg"
-                            >
-                        </div>
-
-                        <div class="flex justify-end gap-3">
-                            <button 
-                                @click="closeNewsModal"
-                                class="px-4 py-2 text-gray-600 hover:text-gray-800"
-                            >
-                                Cancelar
-                            </button>
-                            <button 
-                                @click="saveNews"
-                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            >
-                                {{ showEditNewsModal ? 'Salvar Alterações' : 'Publicar' }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Preview -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Pré-visualização</h4>
-                        <div class="bg-white p-4 rounded-lg shadow">
-                            <h3 class="text-xl font-bold">{{ newsForm.title || 'Título da Notícia' }}</h3>
-                            <p class="text-sm text-gray-600 mt-1">{{ new Date().toLocaleDateString() }}</p>
-                            <p class="mt-4">{{ newsForm.content || 'Conteúdo da notícia...' }}</p>
-                            
-                            <div v-if="newsForm.image" class="mt-4">
-                                <img :src="newsForm.image" alt="Preview" class="max-w-full h-auto rounded-lg">
-                            </div>
-                            
-                            <div v-if="newsForm.video" class="mt-4">
-                                <video class="max-w-full rounded-lg" controls>
-                                    <source :src="newsForm.video" type="video/mp4">
-                                </video>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -398,6 +314,11 @@
     </div>
 
     <script>
+        const supabase = supabase.createClient(
+            'https://odjgklouyfsqhvxvmvdx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
+        )
+
         const { createApp } = Vue
 
         createApp({
@@ -428,7 +349,7 @@
                     tiktokCalculations: []
                 }
             },
-            mounted() {
+            async mounted() {
                 // Check if user is admin
                 const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
                 if (!currentUser.role === 'admin') {
@@ -437,13 +358,19 @@
                 }
 
                 // Load users and news
-                this.loadUsers();
+                await this.loadUsers();
                 this.loadNews();
             },
             methods: {
-                loadUsers() {
+                async loadUsers() {
                     try {
-                        this.users = JSON.parse(localStorage.getItem('users') || '[]');
+                        const { data: users, error } = await supabase
+                            .from('profiles')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.users = users;
                     } catch (error) {
                         console.error('Erro ao carregar usuários:', error);
                     }
@@ -455,21 +382,84 @@
                         console.error('Erro ao carregar notícias:', error);
                     }
                 },
-                editUser(user) {
-                    this.selectedUser = user;
-                    this.formData = { ...user };
-                    this.showEditUserModal = true;
+                async handleSubmit() {
+                    try {
+                        if (this.showEditUserModal) {
+                            // Update user profile
+                            const { error: updateError } = await supabase
+                                .from('profiles')
+                                .update({
+                                    username: this.formData.username,
+                                    name: this.formData.name,
+                                    email: this.formData.email
+                                })
+                                .eq('id', this.selectedUser.id);
+
+                            if (updateError) throw updateError;
+
+                            // Update password if provided
+                            if (this.formData.password) {
+                                const { error: passwordError } = await supabase.auth.updateUser({
+                                    password: this.formData.password
+                                });
+
+                                if (passwordError) throw passwordError;
+                            }
+                        } else {
+                            // Create new user
+                            const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+                                email: this.formData.email,
+                                password: this.formData.password,
+                                options: {
+                                    data: {
+                                        username: this.formData.username,
+                                        name: this.formData.name
+                                    }
+                                }
+                            });
+
+                            if (signUpError) throw signUpError;
+                        }
+
+                        await this.loadUsers();
+                        this.closeModal();
+                    } catch (error) {
+                        console.error('Erro ao salvar usuário:', error);
+                        alert('Falha ao salvar usuário');
+                    }
                 },
                 async deleteUser(user) {
                     if (confirm('Tem certeza que deseja excluir este usuário?')) {
                         try {
-                            this.users = this.users.filter(u => u.username !== user.username);
-                            localStorage.setItem('users', JSON.stringify(this.users));
+                            const { error } = await supabase.auth.admin.deleteUser(user.id);
+                            if (error) throw error;
+                            await this.loadUsers();
                         } catch (error) {
                             console.error('Erro ao excluir usuário:', error);
                             alert('Falha ao excluir usuário');
                         }
                     }
+                },
+                editUser(user) {
+                    this.selectedUser = user;
+                    this.formData = { 
+                        username: user.username,
+                        name: user.name,
+                        email: user.email,
+                        password: '' 
+                    };
+                    this.showEditUserModal = true;
+                },
+                closeModal() {
+                    this.showAddUserModal = false;
+                    this.showEditUserModal = false;
+                    this.selectedUser = null;
+                    this.formData = {
+                        username: '',
+                        name: '',
+                        email: '',
+                        password: ''
+                    };
                 },
                 viewUserCalculations(user) {
                     this.selectedUser = user;
@@ -535,44 +525,6 @@
                         console.error('Erro ao baixar cálculos:', error);
                         alert('Falha ao baixar cálculos');
                     }
-                },
-                handleSubmit() {
-                    try {
-                        if (this.showEditUserModal) {
-                            // Update existing user
-                            const index = this.users.findIndex(u => u.username === this.selectedUser.username);
-                            if (index !== -1) {
-                                this.users[index] = {
-                                    ...this.users[index],
-                                    ...this.formData,
-                                    password: this.formData.password || this.users[index].password
-                                };
-                            }
-                        } else {
-                            // Add new user
-                            this.users.push({
-                                ...this.formData,
-                                id: Date.now()
-                            });
-                        }
-
-                        localStorage.setItem('users', JSON.stringify(this.users));
-                        this.closeModal();
-                    } catch (error) {
-                        console.error('Erro ao salvar usuário:', error);
-                        alert('Falha ao salvar usuário');
-                    }
-                },
-                closeModal() {
-                    this.showAddUserModal = false;
-                    this.showEditUserModal = false;
-                    this.selectedUser = null;
-                    this.formData = {
-                        username: '',
-                        name: '',
-                        email: '',
-                        password: ''
-                    };
                 },
                 closeCalculationsModal() {
                     this.showCalculationsModal = false;

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo</title>
+    <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-white">Painel Administrativo</h1>
+            <div class="flex gap-4">
+                <button 
+                    @click="logout"
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                    Sair
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-xl p-6 mb-8">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex">
+                    <button 
+                        @click="activeTab = 'users'"
+                        :class="[
+                            'py-2 px-4 font-medium',
+                            activeTab === 'users' 
+                                ? 'border-b-2 border-blue-500 text-blue-600'
+                                : 'text-gray-500 hover:text-gray-700'
+                        ]"
+                    >
+                        Usuários
+                    </button>
+                    <button 
+                        @click="activeTab = 'news'"
+                        :class="[
+                            'py-2 px-4 font-medium ml-8',
+                            activeTab === 'news' 
+                                ? 'border-b-2 border-blue-500 text-blue-600'
+                                : 'text-gray-500 hover:text-gray-700'
+                        ]"
+                    >
+                        Notícias
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Users Tab -->
+            <div v-if="activeTab === 'users'" class="mt-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Gerenciamento de Usuários</h2>
+                    <button 
+                        @click="showAddUserModal = true"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Adicionar Usuário
+                    </button>
+                </div>
+
+                <!-- User List -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr v-for="user in users" :key="user.id">
+                                <td class="px-6 py-4 whitespace-nowrap">{{ user.username }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ user.name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ user.email }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <button 
+                                        @click="editUser(user)"
+                                        class="text-blue-600 hover:text-blue-900 mr-4"
+                                    >
+                                        Editar
+                                    </button>
+                                    <button 
+                                        @click="deleteUser(user)"
+                                        class="text-red-600 hover:text-red-900 mr-4"
+                                    >
+                                        Excluir
+                                    </button>
+                                    <button 
+                                        @click="viewUserCalculations(user)"
+                                        class="text-green-600 hover:text-green-900"
+                                    >
+                                        Ver Cálculos
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- News Tab -->
+            <div v-if="activeTab === 'news'" class="mt-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Gerenciamento de Notícias</h2>
+                    <button 
+                        @click="showAddNewsModal = true"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Nova Notícia
+                    </button>
+                </div>
+
+                <!-- News List -->
+                <div class="space-y-4">
+                    <div v-for="post in news" :key="post.id" class="bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-lg font-bold">{{ post.title }}</h3>
+                                <p class="text-sm text-gray-600">{{ new Date(post.date).toLocaleDateString() }}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button 
+                                    @click="editNews(post)"
+                                    class="text-blue-600 hover:text-blue-900"
+                                >
+                                    Editar
+                                </button>
+                                <button 
+                                    @click="deleteNews(post)"
+                                    class="text-red-600 hover:text-red-900"
+                                >
+                                    Excluir
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <p class="text-gray-700">{{ post.content.substring(0, 150) }}...</p>
+                        </div>
+                        <div v-if="post.image" class="mt-2">
+                            <img :src="post.image" alt="Post image" class="h-20 w-auto object-cover rounded">
+                        </div>
+                        <div v-if="post.video" class="mt-2">
+                            <video class="h-20 w-auto object-cover rounded" controls>
+                                <source :src="post.video" type="video/mp4">
+                            </video>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit News Modal -->
+        <div v-if="showAddNewsModal || showEditNewsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-bold mb-4">{{ showEditNewsModal ? 'Editar Notícia' : 'Nova Notícia' }}</h3>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- Form -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                            <input 
+                                type="text" 
+                                v-model="newsForm.title"
+                                class="w-full p-2 border rounded-lg"
+                            >
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Conteúdo</label>
+                            <textarea 
+                                v-model="newsForm.content"
+                                rows="6"
+                                class="w-full p-2 border rounded-lg"
+                            ></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">URL da Imagem</label>
+                            <input 
+                                type="url" 
+                                v-model="newsForm.image"
+                                placeholder="https://exemplo.com/imagem.jpg"
+                                class="w-full p-2 border rounded-lg"
+                            >
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">URL do Vídeo</label>
+                            <input 
+                                type="url" 
+                                v-model="newsForm.video"
+                                placeholder="https://exemplo.com/video.mp4"
+                                class="w-full p-2 border rounded-lg"
+                            >
+                        </div>
+
+                        <div class="flex justify-end gap-3">
+                            <button 
+                                @click="closeNewsModal"
+                                class="px-4 py-2 text-gray-600 hover:text-gray-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                @click="saveNews"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                {{ showEditNewsModal ? 'Salvar Alterações' : 'Publicar' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Pré-visualização</h4>
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-xl font-bold">{{ newsForm.title || 'Título da Notícia' }}</h3>
+                            <p class="text-sm text-gray-600 mt-1">{{ new Date().toLocaleDateString() }}</p>
+                            <p class="mt-4">{{ newsForm.content || 'Conteúdo da notícia...' }}</p>
+                            
+                            <div v-if="newsForm.image" class="mt-4">
+                                <img :src="newsForm.image" alt="Preview" class="max-w-full h-auto rounded-lg">
+                            </div>
+                            
+                            <div v-if="newsForm.video" class="mt-4">
+                                <video class="max-w-full rounded-lg" controls>
+                                    <source :src="newsForm.video" type="video/mp4">
+                                </video>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit User Modal -->
+        <div v-if="showAddUserModal || showEditUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full">
+                <h3 class="text-lg font-bold mb-4">{{ showEditUserModal ? 'Editar Usuário' : 'Adicionar Novo Usuário' }}</h3>
+                <form @submit.prevent="handleSubmit" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Usuário</label>
+                        <input 
+                            type="text" 
+                            v-model="formData.username" 
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Nome</label>
+                        <input 
+                            type="text" 
+                            v-model="formData.name" 
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">E-mail</label>
+                        <input 
+                            type="email" 
+                            v-model="formData.email" 
+                            required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Senha</label>
+                        <input 
+                            type="password" 
+                            v-model="formData.password" 
+                            :required="!showEditUserModal"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                    </div>
+
+                    <div class="flex justify-end gap-4">
+                        <button 
+                            type="button"
+                            @click="closeModal"
+                            class="px-4 py-2 text-gray-700 hover:text-gray-900"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            {{ showEditUserModal ? 'Salvar Alterações' : 'Adicionar Usuário' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- User Calculations Modal -->
+        <div v-if="showCalculationsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold">Histórico de Cálculos - {{ selectedUser?.username }}</h3>
+                    <div class="flex gap-4">
+                        <button 
+                            @click="downloadCalculations"
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                            Baixar Histórico
+                        </button>
+                        <button 
+                            @click="closeCalculationsModal"
+                            class="text-gray-500 hover:text-gray-700"
+                        >
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="-mb-px flex">
+                        <button 
+                            @click="activeTab = 'influencer'"
+                            :class="[
+                                'py-2 px-4 font-medium',
+                                activeTab === 'influencer' 
+                                    ? 'border-b-2 border-blue-500 text-blue-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            ]"
+                        >
+                            Calculadora de Influencer
+                        </button>
+                        <button 
+                            @click="activeTab = 'tiktok'"
+                            :class="[
+                                'py-2 px-4 font-medium ml-8',
+                                activeTab === 'tiktok' 
+                                    ? 'border-b-2 border-blue-500 text-blue-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            ]"
+                        >
+                            Calculadora TikTok
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Influencer Calculations -->
+                <div v-if="activeTab === 'influencer'" class="space-y-4">
+                    <div v-for="calc in influencerCalculations" :key="calc.timestamp" class="border rounded-lg p-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-lg font-medium mb-2">{{ calc.name }}</p>
+                                <p class="text-sm text-gray-600">Seguidores: {{ calc.followers }}</p>
+                                <p class="text-sm text-gray-600">Escopo: {{ calc.scope === 'small' ? 'Pequeno' : 'Grande' }}</p>
+                                <p class="text-sm text-gray-600">Alcance: {{ calc.minReach }}% - {{ calc.maxReach }}%</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">Stories: R$ {{ formatCurrency(calc.storiesValue) }}</p>
+                                <p class="text-sm font-medium">Reels: R$ {{ formatCurrency(calc.reelsValue) }}</p>
+                                <p class="text-xs text-gray-500 mt-2">{{ new Date(calc.timestamp).toLocaleString() }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TikTok Calculations -->
+                <div v-if="activeTab === 'tiktok'" class="space-y-4">
+                    <div v-for="calc in tiktokCalculations" :key="calc.timestamp" class="border rounded-lg p-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-lg font-medium mb-2">{{ calc.name }}</p>
+                                <p class="text-sm text-gray-600">Seguidores: {{ calc.followers }}</p>
+                                <p class="text-sm text-gray-600">Visualizações: {{ calc.views }}</p>
+                                <p class="text-sm text-gray-600">Curtidas: {{ calc.likes }}</p>
+                                <p class="text-sm text-gray-600">Comentários: {{ calc.comments }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium">Valor Total: R$ {{ formatCurrency(calc.totalValue) }}</p>
+                                <p class="text-xs text-gray-500 mt-2">{{ new Date(calc.timestamp).toLocaleString() }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    users: [],
+                    news: [],
+                    activeTab: 'users',
+                    showAddUserModal: false,
+                    showEditUserModal: false,
+                    showCalculationsModal: false,
+                    showAddNewsModal: false,
+                    showEditNewsModal: false,
+                    selectedUser: null,
+                    formData: {
+                        username: '',
+                        name: '',
+                        email: '',
+                        password: ''
+                    },
+                    newsForm: {
+                        title: '',
+                        content: '',
+                        image: '',
+                        video: ''
+                    },
+                    influencerCalculations: [],
+                    tiktokCalculations: []
+                }
+            },
+            mounted() {
+                // Check if user is admin
+                const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                if (!currentUser.role === 'admin') {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                // Load users and news
+                this.loadUsers();
+                this.loadNews();
+            },
+            methods: {
+                loadUsers() {
+                    try {
+                        this.users = JSON.parse(localStorage.getItem('users') || '[]');
+                    } catch (error) {
+                        console.error('Erro ao carregar usuários:', error);
+                    }
+                },
+                loadNews() {
+                    try {
+                        this.news = JSON.parse(localStorage.getItem('news') || '[]');
+                    } catch (error) {
+                        console.error('Erro ao carregar notícias:', error);
+                    }
+                },
+                editUser(user) {
+                    this.selectedUser = user;
+                    this.formData = { ...user };
+                    this.showEditUserModal = true;
+                },
+                async deleteUser(user) {
+                    if (confirm('Tem certeza que deseja excluir este usuário?')) {
+                        try {
+                            this.users = this.users.filter(u => u.username !== user.username);
+                            localStorage.setItem('users', JSON.stringify(this.users));
+                        } catch (error) {
+                            console.error('Erro ao excluir usuário:', error);
+                            alert('Falha ao excluir usuário');
+                        }
+                    }
+                },
+                viewUserCalculations(user) {
+                    this.selectedUser = user;
+                    this.loadUserCalculations(user);
+                    this.showCalculationsModal = true;
+                },
+                loadUserCalculations(user) {
+                    try {
+                        // Load calculations from localStorage
+                        const influencerData = JSON.parse(localStorage.getItem('influencerCalculations') || '[]');
+                        const tiktokData = JSON.parse(localStorage.getItem('tiktokCalculations') || '[]');
+
+                        // Filter calculations for the selected user
+                        this.influencerCalculations = influencerData.filter(calc => calc.username === user.username);
+                        this.tiktokCalculations = tiktokData.filter(calc => calc.username === user.username);
+                    } catch (error) {
+                        console.error('Erro ao carregar cálculos:', error);
+                        alert('Falha ao carregar cálculos');
+                    }
+                },
+                downloadCalculations() {
+                    try {
+                        const calculations = {
+                            username: this.selectedUser.username,
+                            influencer: this.influencerCalculations,
+                            tiktok: this.tiktokCalculations
+                        };
+
+                        // Create text content
+                        let content = `Histórico de Cálculos para ${this.selectedUser.username}\n`;
+                        content += `Gerado em ${new Date().toLocaleString()}\n\n`;
+
+                        content += `=== Histórico da Calculadora de Influencer ===\n\n`;
+                        calculations.influencer.forEach(calc => {
+                            content += `Nome: ${calc.name}\n`;
+                            content += `Data: ${new Date(calc.timestamp).toLocaleString()}\n`;
+                            content += `Seguidores: ${calc.followers}\n`;
+                            content += `Escopo: ${calc.scope === 'small' ? 'Pequeno' : 'Grande'}\n`;
+                            content += `Stories: R$ ${this.formatCurrency(calc.storiesValue)}\n`;
+                            content += `Reels: R$ ${this.formatCurrency(calc.reelsValue)}\n\n`;
+                        });
+
+                        content += `=== Histórico da Calculadora TikTok ===\n\n`;
+                        calculations.tiktok.forEach(calc => {
+                            content += `Nome: ${calc.name}\n`;
+                            content += `Data: ${new Date(calc.timestamp).toLocaleString()}\n`;
+                            content += `Seguidores: ${calc.followers}\n`;
+                            content += `Visualizações: ${calc.views}\n`;
+                            content += `Valor Total: R$ ${this.formatCurrency(calc.totalValue)}\n\n`;
+                        });
+
+                        // Create and download file
+                        const blob = new Blob([content], { type: 'text/plain' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${this.selectedUser.username}-historico-calculos.txt`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    } catch (error) {
+                        console.error('Erro ao baixar cálculos:', error);
+                        alert('Falha ao baixar cálculos');
+                    }
+                },
+                handleSubmit() {
+                    try {
+                        if (this.showEditUserModal) {
+                            // Update existing user
+                            const index = this.users.findIndex(u => u.username === this.selectedUser.username);
+                            if (index !== -1) {
+                                this.users[index] = {
+                                    ...this.users[index],
+                                    ...this.formData,
+                                    password: this.formData.password || this.users[index].password
+                                };
+                            }
+                        } else {
+                            // Add new user
+                            this.users.push({
+                                ...this.formData,
+                                id: Date.now()
+                            });
+                        }
+
+                        localStorage.setItem('users', JSON.stringify(this.users));
+                        this.closeModal();
+                    } catch (error) {
+                        console.error('Erro ao salvar usuário:', error);
+                        alert('Falha ao salvar usuário');
+                    }
+                },
+                closeModal() {
+                    this.showAddUserModal = false;
+                    this.showEditUserModal = false;
+                    this.selectedUser = null;
+                    this.formData = {
+                        username: '',
+                        name: '',
+                        email: '',
+                        password: ''
+                    };
+                },
+                closeCalculationsModal() {
+                    this.showCalculationsModal = false;
+                    this.selectedUser = null;
+                    this.influencerCalculations = [];
+                    this.tiktokCalculations = [];
+                },
+                editNews(post) {
+                    this.newsForm = { ...post };
+                    this.showEditNewsModal = true;
+                },
+                async deleteNews(post) {
+                    if (confirm('Tem certeza que deseja excluir esta notícia?')) {
+                        try {
+                            this.news = this.news.filter(p => p.id !== post.id);
+                            localStorage.setItem('news', JSON.stringify(this.news));
+                        } catch (error) {
+                            console.error('Erro ao excluir notícia:', error);
+                            alert('Falha ao excluir notícia');
+                        }
+                    }
+                },
+                closeNewsModal() {
+                    this.showAddNewsModal = false;
+                    this.showEditNewsModal = false;
+                    this.newsForm = {
+                        title: '',
+                        content: '',
+                        image: '',
+                        video: ''
+                    };
+                },
+                async saveNews() {
+                    try {
+                        const post = {
+                            ...this.newsForm,
+                            id: this.showEditNewsModal ? this.newsForm.id : Date.now(),
+                            date: this.showEditNewsModal ? this.newsForm.date : new Date().toISOString()
+                        };
+
+                        if (this.showEditNewsModal) {
+                            const index = this.news.findIndex(p => p.id === post.id);
+                            if (index !== -1) {
+                                this.news[index] = post;
+                            }
+                        } else {
+                            this.news.unshift(post);
+                        }
+
+                        localStorage.setItem('news', JSON.stringify(this.news));
+                        this.closeNewsModal();
+                    } catch (error) {
+                        console.error('Erro ao salvar notícia:', error);
+                        alert('Falha ao salvar notícia');
+                    }
+                },
+                formatCurrency(value) {
+                    return Number(value).toFixed(2);
+                },
+                logout() {
+                    localStorage.removeItem('isLoggedIn');
+                    localStorage.removeItem('currentUser');
+                    window.location.href = '/login.html';
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

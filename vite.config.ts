@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  optimizeDeps: {
-    exclude: ['lucide-react'],
-  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        admin: 'public/admin-panel.html',
+        home: 'public/home.html',
+        influencer: 'public/influencer-calculator.html',
+        login: 'public/login.html',
+        profile: 'public/profile.html',
+        stream: 'public/stream-tools.html',
+        tiktok: 'public/tiktok-calculator.html'
+      }
+    }
+  }
 });

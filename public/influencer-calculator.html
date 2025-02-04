@@ -365,31 +365,37 @@
 
                     try {
                         this.loading = true;
-                        const calculation = {
+                        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+                        
+                        const calculationData = {
+                            user_id: currentUser.id,
                             name: this.saveName.trim(),
-                            followers: this.followers,
-                            scope: this.scope,
-                            minReach: this.minReach,
-                            maxReach: this.maxReach,
-                            engagement: this.engagement,
-                            licenseDays: this.licenseDays,
-                            storiesValue: this.totalValue,
-                            reelsValue: this.totalValue * 2,
-                            timestamp: new Date().toISOString()
+                            type: 'instagram',
+                            data: {
+                                followers: this.followers,
+                                scope: this.scope,
+                                minReach: this.minReach,
+                                maxReach: this.maxReach,
+                                engagement: this.engagement,
+                                licenseDays: this.licenseDays,
+                                storiesValue: this.totalValue,
+                                reelsValue: this.totalValue * 2,
+                                hasDiscount: this.hasDiscount
+                            }
                         };
 
-                        // Add to history, keeping only the last 5 entries
-                        this.history.unshift(calculation);
-                        if (this.history.length > 5) {
-                            this.history = this.history.slice(0, 5);
-                        }
+                        const { error } = await supabaseClient
+                            .from('calculations')
+                            .insert([calculationData]);
 
-                        // Save to localStorage
-                        localStorage.setItem('influencerCalculations', JSON.stringify(this.history));
+                        if (error) throw error;
                         
                         this.lastSavedAt = new Date().toLocaleTimeString();
                         this.showSaveDialog = false;
                         this.saveName = '';
+                        
+                        // Atualizar histórico local
+                        await this.loadHistory();
                     } catch (error) {
                         console.error('Erro ao salvar cálculo:', error);
                         alert('Erro ao salvar o cálculo');
@@ -397,6 +403,25 @@
                         this.loading = false;
                     }
                 },
+
+                async loadHistory() {
+                    try {
+                        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+                        const { data: calculations, error } = await supabaseClient
+                            .from('calculations')
+                            .select('*')
+                            .eq('user_id', currentUser.id)
+                            .eq('type', 'instagram')
+                            .order('created_at', { ascending: false })
+                            .limit(5);
+
+                        if (error) throw error;
+                        this.history = calculations;
+                    } catch (error) {
+                        console.error('Erro ao carregar histórico:', error);
+                    }
+                },
+
                 toggleHistory() {
                     this.showHistory = !this.showHistory;
                 },

@@ -91,64 +91,81 @@
             },
             mounted() {
                 // Check if already logged in
+                const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
                 if (localStorage.getItem('isLoggedIn')) {
-                    window.location.href = '/home.html';
+                    window.location.href = currentUser.role === 'admin' ? '/admin-panel.html' : '/home.html';
                 }
             },
             methods: {
+                handleErrorMessage(error) {
+                    if (error.message === 'Senha incorreta') {
+                        return 'Senha incorreta';
+                    }
+                    if (error.code === 'invalid_credentials') {
+                        return 'E-mail ou senha inválidos';
+                    }
+                    return 'Erro ao fazer login. Por favor, tente novamente.';
+                },
                 async handleLogin() {
+                    if (!this.email || !this.password) {
+                        this.error = 'Por favor, preencha todos os campos';
+                        return;
+                    }
+
                     this.loading = true;
                     this.error = '';
 
                     try {
-                        // Check for admin login
-                        if (this.email === 'admin@dino.com' && this.password === 'dino24413') {
-                            const { data: { user }, error } = await supabaseClient.auth.signUp({
-                                email: this.email,
-                                password: this.password,
-                                options: {
-                                    data: {
-                                        username: 'Admindino',
-                                        name: 'Admin',
-                                        role: 'admin'
-                                    }
-                                }
-                            });
-
-                            if (error) throw error;
-
-                            localStorage.setItem('isLoggedIn', 'true');
-                            localStorage.setItem('currentUser', JSON.stringify({
-                                username: 'Admindino',
-                                role: 'admin'
-                            }));
-                            window.location.href = '/admin-panel.html';
-                            return;
+                        // Admin login
+                        if (this.email === 'contato@dinoraw.com.br') {
+                            if (this.password === 'dino24413') {
+                                const adminUser = {
+                                    username: 'DinoRaw',
+                                    name: 'Admin DinoRaw',
+                                    email: this.email,
+                                    role: 'admin'
+                                };
+                                localStorage.setItem('isLoggedIn', 'true');
+                                localStorage.setItem('currentUser', JSON.stringify(adminUser));
+                                window.location.href = '/admin-panel.html';
+                                return;
+                            }
+                            throw new Error('Senha incorreta');
                         }
 
                         // Regular user login
-                        const { data: { user }, error } = await supabaseClient.auth.signInWithPassword({
+                        const { data, error: signInError } = await supabaseClient.auth.signInWithPassword({
                             email: this.email,
                             password: this.password
                         });
 
-                        if (error) throw error;
+                        if (signInError) throw signInError;
 
-                        const { data: profile } = await supabaseClient
+                        const { data: profile, error: profileError } = await supabaseClient
                             .from('profiles')
                             .select('*')
-                            .eq('id', user.id)
+                            .eq('id', data.user.id)
                             .single();
 
-                        localStorage.setItem('isLoggedIn', 'true');
-                        localStorage.setItem('currentUser', JSON.stringify({
+                        if (profileError) {
+                            throw new Error('Erro ao carregar perfil do usuário');
+                        }
+
+                        if (!profile) {
+                            throw new Error('Perfil não encontrado');
+                        }
+
+                        const userData = {
                             ...profile,
-                            role: 'user'
-                        }));
+                            role: profile.role || 'user'
+                        };
+
+                        localStorage.setItem('isLoggedIn', 'true');
+                        localStorage.setItem('currentUser', JSON.stringify(userData));
                         window.location.href = '/home.html';
+
                     } catch (error) {
-                        console.error('Erro de login:', error);
-                        this.error = 'E-mail ou senha inválidos';
+                        this.error = this.handleErrorMessage(error);
                     } finally {
                         this.loading = false;
                     }

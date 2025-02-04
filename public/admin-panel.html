@@ -49,6 +49,17 @@
                     >
                         Notícias
                     </button>
+                    <button 
+                        @click="activeTab = 'calculations'"
+                        :class="[
+                            'py-2 px-4 font-medium ml-8',
+                            activeTab === 'calculations' 
+                                ? 'border-b-2 border-blue-500 text-blue-600'
+                                : 'text-gray-500 hover:text-gray-700'
+                        ]"
+                    >
+                        Cálculos
+                    </button>
                 </nav>
             </div>
 
@@ -64,14 +75,32 @@
                     </button>
                 </div>
 
+                <!-- Loading State -->
+                <div v-if="loading" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                    <p class="mt-2 text-gray-600">Carregando usuários...</p>
+                </div>
+
+                <!-- Error State -->
+                <div v-else-if="error" class="text-center py-8">
+                    <p class="text-red-600">{{ error }}</p>
+                    <button 
+                        @click="loadUsers"
+                        class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Tentar Novamente
+                    </button>
+                </div>
+
                 <!-- User List -->
-                <div class="overflow-x-auto">
+                <div v-else class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Função</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
@@ -81,6 +110,12 @@
                                 <td class="px-6 py-4 whitespace-nowrap">{{ user.name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">{{ user.email }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full"
+                                          :class="user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'">
+                                        {{ user.role === 'admin' ? 'Administrador' : 'Usuário' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
                                     <button 
                                         @click="editUser(user)"
                                         class="text-blue-600 hover:text-blue-900 mr-4"
@@ -88,16 +123,10 @@
                                         Editar
                                     </button>
                                     <button 
-                                        @click="deleteUser(user)"
-                                        class="text-red-600 hover:text-red-900 mr-4"
+                                        @click="confirmDeleteUser(user)"
+                                        class="text-red-600 hover:text-red-900"
                                     >
                                         Excluir
-                                    </button>
-                                    <button 
-                                        @click="viewUserCalculations(user)"
-                                        class="text-green-600 hover:text-green-900"
-                                    >
-                                        Ver Cálculos
                                     </button>
                                 </td>
                             </tr>
@@ -124,7 +153,7 @@
                         <div class="flex justify-between items-start">
                             <div>
                                 <h3 class="text-lg font-bold">{{ post.title }}</h3>
-                                <p class="text-sm text-gray-600">{{ new Date(post.date).toLocaleDateString() }}</p>
+                                <p class="text-sm text-gray-600">{{ formatDate(post.created_at) }}</p>
                             </div>
                             <div class="flex gap-2">
                                 <button 
@@ -142,7 +171,7 @@
                             </div>
                         </div>
                         <div class="mt-2">
-                            <p class="text-gray-700">{{ post.content.substring(0, 150) }}...</p>
+                            <p class="text-gray-700">{{ post.content }}</p>
                         </div>
                         <div v-if="post.image" class="mt-2">
                             <img :src="post.image" alt="Post image" class="h-20 w-auto object-cover rounded">
@@ -155,13 +184,110 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Calculations History Tab -->
+            <div v-if="activeTab === 'calculations'" class="mt-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Histórico de Cálculos</h2>
+                    <div class="flex gap-4">
+                        <select 
+                            v-model="selectedUser"
+                            class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="all">Todos os Usuários</option>
+                            <option v-for="user in users" :key="user.id" :value="user.id">
+                                {{ user.username }}
+                            </option>
+                        </select>
+                        <select 
+                            v-model="calculationType"
+                            class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="all">Todos os Tipos</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="tiktok">TikTok</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div v-if="loadingCalculations" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                    <p class="mt-2 text-gray-600">Carregando cálculos...</p>
+                </div>
+
+                <!-- Error State -->
+                <div v-else-if="calculationsError" class="text-center py-8">
+                    <p class="text-red-600">{{ calculationsError }}</p>
+                    <button 
+                        @click="loadCalculations"
+                        class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Tentar Novamente
+                    </button>
+                </div>
+
+                <!-- Calculations List -->
+                <div v-else class="space-y-4">
+                    <div v-for="calc in filteredCalculations" :key="calc.id" class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-lg font-bold">{{ calc.name }}</h3>
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full"
+                                          :class="calc.type === 'instagram' ? 'bg-pink-100 text-pink-800' : 'bg-black text-white'">
+                                        {{ calc.type === 'instagram' ? 'Instagram' : 'TikTok' }}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600">
+                                    {{ getUserName(calc.user_id) }} • {{ formatDate(calc.created_at) }}
+                                </p>
+                            </div>
+                            <button 
+                                @click="deleteCalculation(calc)"
+                                class="text-red-600 hover:text-red-900"
+                            >
+                                Excluir
+                            </button>
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-4">
+                            <div v-if="calc.type === 'instagram'">
+                                <p class="text-sm text-gray-600">Seguidores: {{ calc.data.followers }}</p>
+                                <p class="text-sm text-gray-600">Alcance Mínimo: {{ calc.data.minReach }}%</p>
+                                <p class="text-sm text-gray-600">Alcance Máximo: {{ calc.data.maxReach }}%</p>
+                                <p class="text-sm text-gray-600">Engajamento: {{ calc.data.engagement }}%</p>
+                                <p class="text-sm font-medium mt-2">
+                                    Stories: R$ {{ formatCurrency(calc.data.storiesValue) }}
+                                </p>
+                                <p class="text-sm font-medium">
+                                    Reels: R$ {{ formatCurrency(calc.data.reelsValue) }}
+                                </p>
+                            </div>
+                            <div v-else>
+                                <p class="text-sm text-gray-600">Seguidores: {{ calc.data.followers }}</p>
+                                <p class="text-sm text-gray-600">Visualizações: {{ calc.data.views }}</p>
+                                <p class="text-sm text-gray-600">Curtidas: {{ calc.data.likes }}</p>
+                                <p class="text-sm text-gray-600">Comentários: {{ calc.data.comments }}</p>
+                                <p class="text-sm font-medium mt-2">
+                                    Valor Total: R$ {{ formatCurrency(calc.data.totalValue) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-if="filteredCalculations.length === 0" class="text-center py-8 text-gray-600">
+                        Nenhum cálculo encontrado
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Add/Edit User Modal -->
         <div v-if="showAddUserModal || showEditUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-lg p-6 max-w-md w-full">
                 <h3 class="text-lg font-bold mb-4">{{ showEditUserModal ? 'Editar Usuário' : 'Adicionar Novo Usuário' }}</h3>
-                <form @submit.prevent="handleSubmit" class="space-y-4">
+                <form @submit.prevent="saveUser" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Usuário</label>
                         <input 
@@ -193,7 +319,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Senha</label>
+                        <label class="block text-sm font-medium text-gray-700">Senha {{ showEditUserModal ? '(deixe em branco para manter a atual)' : '' }}</label>
                         <input 
                             type="password" 
                             v-model="formData.password" 
@@ -202,10 +328,25 @@
                         >
                     </div>
 
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Função</label>
+                        <select 
+                            v-model="formData.role"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        >
+                            <option value="user">Usuário</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+
+                    <div v-if="formError" class="text-sm text-red-600">
+                        {{ formError }}
+                    </div>
+
                     <div class="flex justify-end gap-4">
                         <button 
                             type="button"
-                            @click="closeModal"
+                            @click="closeUserModal"
                             class="px-4 py-2 text-gray-700 hover:text-gray-900"
                         >
                             Cancelar
@@ -213,158 +354,113 @@
                         <button 
                             type="submit"
                             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            :disabled="formLoading"
                         >
-                            {{ showEditUserModal ? 'Salvar Alterações' : 'Adicionar Usuário' }}
+                            {{ formLoading ? 'Salvando...' : (showEditUserModal ? 'Salvar Alterações' : 'Adicionar Usuário') }}
                         </button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- User Calculations Modal -->
-        <div v-if="showCalculationsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-lg font-bold">Histórico de Cálculos - {{ selectedUser?.username }}</h3>
-                    <div class="flex gap-4">
-                        <button 
-                            @click="downloadCalculations"
-                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                            Baixar Histórico
-                        </button>
-                        <button 
-                            @click="closeCalculationsModal"
-                            class="text-gray-500 hover:text-gray-700"
-                        >
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Tabs -->
-                <div class="border-b border-gray-200 mb-6">
-                    <nav class="-mb-px flex">
-                        <button 
-                            @click="activeTab = 'influencer'"
-                            :class="[
-                                'py-2 px-4 font-medium',
-                                activeTab === 'influencer' 
-                                    ? 'border-b-2 border-blue-500 text-blue-600'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            ]"
-                        >
-                            Calculadora de Influencer
-                        </button>
-                        <button 
-                            @click="activeTab = 'tiktok'"
-                            :class="[
-                                'py-2 px-4 font-medium ml-8',
-                                activeTab === 'tiktok' 
-                                    ? 'border-b-2 border-blue-500 text-blue-600'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            ]"
-                        >
-                            Calculadora TikTok
-                        </button>
-                    </nav>
-                </div>
-
-                <!-- Influencer Calculations -->
-                <div v-if="activeTab === 'influencer'" class="space-y-4">
-                    <div v-for="calc in influencerCalculations" :key="calc.timestamp" class="border rounded-lg p-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-lg font-medium mb-2">{{ calc.name }}</p>
-                                <p class="text-sm text-gray-600">Seguidores: {{ calc.followers }}</p>
-                                <p class="text-sm text-gray-600">Escopo: {{ calc.scope === 'small' ? 'Pequeno' : 'Grande' }}</p>
-                                <p class="text-sm text-gray-600">Alcance: {{ calc.minReach }}% - {{ calc.maxReach }}%</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium">Stories: R$ {{ formatCurrency(calc.storiesValue) }}</p>
-                                <p class="text-sm font-medium">Reels: R$ {{ formatCurrency(calc.reelsValue) }}</p>
-                                <p class="text-xs text-gray-500 mt-2">{{ new Date(calc.timestamp).toLocaleString() }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TikTok Calculations -->
-                <div v-if="activeTab === 'tiktok'" class="space-y-4">
-                    <div v-for="calc in tiktokCalculations" :key="calc.timestamp" class="border rounded-lg p-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-lg font-medium mb-2">{{ calc.name }}</p>
-                                <p class="text-sm text-gray-600">Seguidores: {{ calc.followers }}</p>
-                                <p class="text-sm text-gray-600">Visualizações: {{ calc.views }}</p>
-                                <p class="text-sm text-gray-600">Curtidas: {{ calc.likes }}</p>
-                                <p class="text-sm text-gray-600">Comentários: {{ calc.comments }}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium">Valor Total: R$ {{ formatCurrency(calc.totalValue) }}</p>
-                                <p class="text-xs text-gray-500 mt-2">{{ new Date(calc.timestamp).toLocaleString() }}</p>
-                            </div>
-                        </div>
-                    </div>
+        <!-- Delete Confirmation Modal -->
+        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full">
+                <h3 class="text-lg font-bold mb-4">Confirmar Exclusão</h3>
+                <p class="text-gray-600 mb-6">
+                    Tem certeza que deseja excluir o usuário "{{ userToDelete?.username }}"? Esta ação não pode ser desfeita.
+                </p>
+                <div class="flex justify-end gap-4">
+                    <button 
+                        @click="showDeleteModal = false"
+                        class="px-4 py-2 text-gray-700 hover:text-gray-900"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        @click="deleteUser"
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        :disabled="deleteLoading"
+                    >
+                        {{ deleteLoading ? 'Excluindo...' : 'Excluir' }}
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const supabase = supabase.createClient(
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
             'https://odjgklouyfsqhvxvmvdx.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
-        )
+        );
 
-        const { createApp } = Vue
+        const { createApp } = Vue;
 
         createApp({
             data() {
                 return {
                     users: [],
                     news: [],
+                    calculations: [],
                     activeTab: 'users',
+                    selectedUser: 'all',
+                    calculationType: 'all',
+                    loading: false,
+                    loadingCalculations: false,
+                    error: null,
+                    calculationsError: null,
                     showAddUserModal: false,
                     showEditUserModal: false,
-                    showCalculationsModal: false,
-                    showAddNewsModal: false,
-                    showEditNewsModal: false,
-                    selectedUser: null,
+                    showDeleteModal: false,
+                    userToDelete: null,
+                    deleteLoading: false,
+                    formLoading: false,
+                    formError: null,
                     formData: {
                         username: '',
                         name: '',
                         email: '',
-                        password: ''
-                    },
-                    newsForm: {
-                        title: '',
-                        content: '',
-                        image: '',
-                        video: ''
-                    },
-                    influencerCalculations: [],
-                    tiktokCalculations: []
+                        password: '',
+                        role: 'user'
+                    }
+                }
+            },
+            computed: {
+                filteredCalculations() {
+                    let filtered = [...this.calculations];
+                    
+                    if (this.selectedUser !== 'all') {
+                        filtered = filtered.filter(calc => calc.user_id === this.selectedUser);
+                    }
+                    
+                    if (this.calculationType !== 'all') {
+                        filtered = filtered.filter(calc => calc.type === this.calculationType);
+                    }
+                    
+                    return filtered;
                 }
             },
             async mounted() {
                 // Check if user is admin
                 const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-                if (!currentUser.role === 'admin') {
+                if (currentUser.role !== 'admin') {
                     window.location.href = '/login.html';
                     return;
                 }
 
-                // Load users and news
                 await this.loadUsers();
-                this.loadNews();
+                await this.loadNews();
+                await this.loadCalculations();
             },
             methods: {
                 async loadUsers() {
+                    this.loading = true;
+                    this.error = null;
+
                     try {
-                        const { data: users, error } = await supabase
+                        const { data: users, error } = await supabaseClient
                             .from('profiles')
                             .select('*')
                             .order('created_at', { ascending: false });
@@ -373,47 +469,104 @@
                         this.users = users;
                     } catch (error) {
                         console.error('Erro ao carregar usuários:', error);
+                        this.error = 'Falha ao carregar a lista de usuários. Por favor, tente novamente.';
+                    } finally {
+                        this.loading = false;
                     }
                 },
-                loadNews() {
+                async loadNews() {
                     try {
-                        this.news = JSON.parse(localStorage.getItem('news') || '[]');
+                        const { data: news, error } = await supabaseClient
+                            .from('news')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.news = news;
                     } catch (error) {
                         console.error('Erro ao carregar notícias:', error);
                     }
                 },
-                async handleSubmit() {
+                async loadCalculations() {
+                    this.loadingCalculations = true;
+                    this.calculationsError = null;
+                    
+                    try {
+                        const { data: calculations, error } = await supabaseClient
+                            .from('calculations')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.calculations = calculations;
+                    } catch (error) {
+                        console.error('Erro ao carregar cálculos:', error);
+                        this.calculationsError = 'Falha ao carregar histórico de cálculos';
+                    } finally {
+                        this.loadingCalculations = false;
+                    }
+                },
+                editUser(user) {
+                    this.formData = { ...user, password: '' };
+                    this.showEditUserModal = true;
+                },
+                confirmDeleteUser(user) {
+                    this.userToDelete = user;
+                    this.showDeleteModal = true;
+                },
+                async deleteUser() {
+                    if (!this.userToDelete) return;
+
+                    this.deleteLoading = true;
+                    try {
+                        const { error } = await supabaseClient
+                            .from('profiles')
+                            .delete()
+                            .eq('id', this.userToDelete.id);
+
+                        if (error) throw error;
+                        
+                        await this.loadUsers();
+                        this.showDeleteModal = false;
+                        this.userToDelete = null;
+                    } catch (error) {
+                        console.error('Erro ao excluir usuário:', error);
+                        alert('Falha ao excluir usuário. Por favor, tente novamente.');
+                    } finally {
+                        this.deleteLoading = false;
+                    }
+                },
+                async saveUser() {
+                    this.formLoading = true;
+                    this.formError = null;
+
                     try {
                         if (this.showEditUserModal) {
-                            // Update user profile
-                            const { error: updateError } = await supabase
+                            // Update existing user
+                            const updateData = {
+                                username: this.formData.username,
+                                name: this.formData.name,
+                                email: this.formData.email,
+                                role: this.formData.role,
+                                updated_at: new Date().toISOString()
+                            };
+
+                            const { error } = await supabaseClient
                                 .from('profiles')
-                                .update({
-                                    username: this.formData.username,
-                                    name: this.formData.name,
-                                    email: this.formData.email
-                                })
-                                .eq('id', this.selectedUser.id);
+                                .update(updateData)
+                                .eq('id', this.formData.id);
 
-                            if (updateError) throw updateError;
-
-                            // Update password if provided
-                            if (this.formData.password) {
-                                const { error: passwordError } = await supabase.auth.updateUser({
-                                    password: this.formData.password
-                                });
-
-                                if (passwordError) throw passwordError;
-                            }
+                            if (error) throw error;
                         } else {
-                            // Create new user
-                            const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+                            // Add new user
+                            const { data: { user }, error: signUpError } = await supabaseClient.auth.signUp({
                                 email: this.formData.email,
                                 password: this.formData.password,
                                 options: {
                                     data: {
                                         username: this.formData.username,
-                                        name: this.formData.name
+                                        name: this.formData.name,
+                                        role: this.formData.role
                                     }
                                 }
                             });
@@ -422,167 +575,62 @@
                         }
 
                         await this.loadUsers();
-                        this.closeModal();
+                        this.closeUserModal();
                     } catch (error) {
                         console.error('Erro ao salvar usuário:', error);
-                        alert('Falha ao salvar usuário');
+                        this.formError = 'Falha ao salvar usuário. Por favor, verifique os dados e tente novamente.';
+                    } finally {
+                        this.formLoading = false;
                     }
                 },
-                async deleteUser(user) {
-                    if (confirm('Tem certeza que deseja excluir este usuário?')) {
-                        try {
-                            const { error } = await supabase.auth.admin.deleteUser(user.id);
-                            if (error) throw error;
-                            await this.loadUsers();
-                        } catch (error) {
-                            console.error('Erro ao excluir usuário:', error);
-                            alert('Falha ao excluir usuário');
-                        }
-                    }
-                },
-                editUser(user) {
-                    this.selectedUser = user;
-                    this.formData = { 
-                        username: user.username,
-                        name: user.name,
-                        email: user.email,
-                        password: '' 
-                    };
-                    this.showEditUserModal = true;
-                },
-                closeModal() {
+                closeUserModal() {
                     this.showAddUserModal = false;
                     this.showEditUserModal = false;
-                    this.selectedUser = null;
                     this.formData = {
                         username: '',
                         name: '',
                         email: '',
-                        password: ''
+                        password: '',
+                        role: 'user'
                     };
+                    this.formError = null;
                 },
-                viewUserCalculations(user) {
-                    this.selectedUser = user;
-                    this.loadUserCalculations(user);
-                    this.showCalculationsModal = true;
-                },
-                loadUserCalculations(user) {
+                async deleteCalculation(calc) {
+                    if (!confirm('Tem certeza que deseja excluir este cálculo?')) {
+                        return;
+                    }
+
                     try {
-                        // Load calculations from localStorage
-                        const influencerData = JSON.parse(localStorage.getItem('influencerCalculations') || '[]');
-                        const tiktokData = JSON.parse(localStorage.getItem('tiktokCalculations') || '[]');
+                        const { error } = await supabaseClient
+                            .from('calculations')
+                            .delete()
+                            .eq('id', calc.id);
 
-                        // Filter calculations for the selected user
-                        this.influencerCalculations = influencerData.filter(calc => calc.username === user.username);
-                        this.tiktokCalculations = tiktokData.filter(calc => calc.username === user.username);
+                        if (error) throw error;
+                        await this.loadCalculations();
                     } catch (error) {
-                        console.error('Erro ao carregar cálculos:', error);
-                        alert('Falha ao carregar cálculos');
+                        console.error('Erro ao excluir cálculo:', error);
+                        alert('Falha ao excluir cálculo');
                     }
                 },
-                downloadCalculations() {
-                    try {
-                        const calculations = {
-                            username: this.selectedUser.username,
-                            influencer: this.influencerCalculations,
-                            tiktok: this.tiktokCalculations
-                        };
-
-                        // Create text content
-                        let content = `Histórico de Cálculos para ${this.selectedUser.username}\n`;
-                        content += `Gerado em ${new Date().toLocaleString()}\n\n`;
-
-                        content += `=== Histórico da Calculadora de Influencer ===\n\n`;
-                        calculations.influencer.forEach(calc => {
-                            content += `Nome: ${calc.name}\n`;
-                            content += `Data: ${new Date(calc.timestamp).toLocaleString()}\n`;
-                            content += `Seguidores: ${calc.followers}\n`;
-                            content += `Escopo: ${calc.scope === 'small' ? 'Pequeno' : 'Grande'}\n`;
-                            content += `Stories: R$ ${this.formatCurrency(calc.storiesValue)}\n`;
-                            content += `Reels: R$ ${this.formatCurrency(calc.reelsValue)}\n\n`;
-                        });
-
-                        content += `=== Histórico da Calculadora TikTok ===\n\n`;
-                        calculations.tiktok.forEach(calc => {
-                            content += `Nome: ${calc.name}\n`;
-                            content += `Data: ${new Date(calc.timestamp).toLocaleString()}\n`;
-                            content += `Seguidores: ${calc.followers}\n`;
-                            content += `Visualizações: ${calc.views}\n`;
-                            content += `Valor Total: R$ ${this.formatCurrency(calc.totalValue)}\n\n`;
-                        });
-
-                        // Create and download file
-                        const blob = new Blob([content], { type: 'text/plain' });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${this.selectedUser.username}-historico-calculos.txt`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                    } catch (error) {
-                        console.error('Erro ao baixar cálculos:', error);
-                        alert('Falha ao baixar cálculos');
-                    }
-                },
-                closeCalculationsModal() {
-                    this.showCalculationsModal = false;
-                    this.selectedUser = null;
-                    this.influencerCalculations = [];
-                    this.tiktokCalculations = [];
-                },
-                editNews(post) {
-                    this.newsForm = { ...post };
-                    this.showEditNewsModal = true;
-                },
-                async deleteNews(post) {
-                    if (confirm('Tem certeza que deseja excluir esta notícia?')) {
-                        try {
-                            this.news = this.news.filter(p => p.id !== post.id);
-                            localStorage.setItem('news', JSON.stringify(this.news));
-                        } catch (error) {
-                            console.error('Erro ao excluir notícia:', error);
-                            alert('Falha ao excluir notícia');
-                        }
-                    }
-                },
-                closeNewsModal() {
-                    this.showAddNewsModal = false;
-                    this.showEditNewsModal = false;
-                    this.newsForm = {
-                        title: '',
-                        content: '',
-                        image: '',
-                        video: ''
-                    };
-                },
-                async saveNews() {
-                    try {
-                        const post = {
-                            ...this.newsForm,
-                            id: this.showEditNewsModal ? this.newsForm.id : Date.now(),
-                            date: this.showEditNewsModal ? this.newsForm.date : new Date().toISOString()
-                        };
-
-                        if (this.showEditNewsModal) {
-                            const index = this.news.findIndex(p => p.id === post.id);
-                            if (index !== -1) {
-                                this.news[index] = post;
-                            }
-                        } else {
-                            this.news.unshift(post);
-                        }
-
-                        localStorage.setItem('news', JSON.stringify(this.news));
-                        this.closeNewsModal();
-                    } catch (error) {
-                        console.error('Erro ao salvar notícia:', error);
-                        alert('Falha ao salvar notícia');
-                    }
+                getUserName(userId) {
+                    const user = this.users.find(u => u.id === userId);
+                    return user ? user.username : 'Usuário Desconhecido';
                 },
                 formatCurrency(value) {
-                    return Number(value).toFixed(2);
+                    return Number(value).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                },
+                formatDate(date) {
+                    return new Date(date).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
                 },
                 logout() {
                     localStorage.removeItem('isLoggedIn');

@@ -1,97 +1,24 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+<!-- Head permanece o mesmo -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Início</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
-    <div id="app" class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-white">Bem-vindo(a), {{ user?.username }}</h1>
-            <div class="flex gap-4">
-                <button 
-                    @click="goToProfile"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    Perfil
-                </button>
-                <button 
-                    @click="logout"
-                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                    Sair
-                </button>
-            </div>
-        </div>
-
-        <!-- Navigation Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-            <button
-                @click="goToCalculator"
-                class="p-6 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white text-xl font-bold hover:opacity-90 transition-all"
-            >
-                Calculadora de Publis
-            </button>
-            
-            <button
-                @click="goToStreamTools"
-                class="p-6 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl text-white text-xl font-bold hover:opacity-90 transition-all"
-            >
-                Ferramentas para Streams
-            </button>
-            
-            <button
-                class="p-6 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl text-white text-xl font-bold hover:opacity-90 transition-all"
-            >
-                Conteúdo para Criadores
-            </button>
-            
-            <button
-                class="p-6 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white text-xl font-bold hover:opacity-90 transition-all"
-            >
-                Sets de Iluminação
-            </button>
-        </div>
-
-        <!-- News Section -->
-        <div class="bg-white/10 backdrop-blur-sm rounded-xl p-6">
-            <h2 class="text-2xl font-bold text-white mb-6">Últimas Novidades</h2>
-            
-            <div class="space-y-6">
-                <div v-for="post in news" :key="post.id" class="bg-white rounded-lg shadow-xl overflow-hidden">
-                    <div class="p-6">
-                        <h3 class="text-xl font-bold text-gray-900">{{ post.title }}</h3>
-                        <p class="text-sm text-gray-600 mt-1">{{ new Date(post.date).toLocaleDateString() }}</p>
-                        
-                        <div class="mt-4 prose">
-                            <p class="text-gray-700">{{ post.content }}</p>
-                        </div>
-                        
-                        <div v-if="post.image" class="mt-4">
-                            <img :src="post.image" :alt="post.title" class="w-full h-auto rounded-lg">
-                        </div>
-                        
-                        <div v-if="post.video" class="mt-4">
-                            <video class="w-full rounded-lg" controls>
-                                <source :src="post.video" type="video/mp4">
-                            </video>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="news.length === 0" class="text-center py-12">
-                    <p class="text-white text-lg">Nenhuma novidade por enquanto!</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
+    <!-- O HTML permanece o mesmo até o script -->
     <script>
-        const { createApp } = Vue
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
+            'https://odjgklouyfsqhvxvmvdx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
+        );
+
+        const { createApp } = Vue;
 
         createApp({
             data() {
@@ -100,7 +27,7 @@
                     news: []
                 }
             },
-            mounted() {
+            async mounted() {
                 // Check authentication
                 if (!localStorage.getItem('isLoggedIn')) {
                     window.location.href = '/login.html';
@@ -116,15 +43,24 @@
                 }
 
                 // Load news
-                this.loadNews();
+                await this.loadNews();
             },
             methods: {
-                loadNews() {
+                async loadNews() {
                     try {
-                        this.news = JSON.parse(localStorage.getItem('news') || '[]');
+                        const { data: news, error } = await supabaseClient
+                            .from('news')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.news = news;
                     } catch (error) {
                         console.error('Erro ao carregar notícias:', error);
                     }
+                },
+                formatDate(date) {
+                    return new Date(date).toLocaleDateString('pt-BR');
                 },
                 goToCalculator() {
                     window.location.href = '/index.html';

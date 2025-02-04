@@ -6,7 +6,7 @@
     <title>Painel Administrativo</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
     <div id="app" class="container mx-auto px-4 py-8">
@@ -75,6 +75,28 @@
                     </button>
                 </div>
 
+                <!-- Search and Filter -->
+                <div class="mb-6 flex gap-4">
+                    <div class="flex-1">
+                        <input 
+                            type="text" 
+                            v-model="userSearch" 
+                            placeholder="Buscar por nome, email ou usuário..."
+                            class="w-full p-2 border rounded-lg"
+                            @input="filterUsers"
+                        >
+                    </div>
+                    <select 
+                        v-model="userFilter" 
+                        class="p-2 border rounded-lg"
+                        @change="filterUsers"
+                    >
+                        <option value="all">Todos</option>
+                        <option value="admin">Administradores</option>
+                        <option value="user">Usuários</option>
+                    </select>
+                </div>
+
                 <!-- Loading State -->
                 <div v-if="loading" class="text-center py-8">
                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
@@ -101,11 +123,12 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Função</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de Cadastro</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            <tr v-for="user in users" :key="user.id">
+                            <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-gray-50">
                                 <td class="px-6 py-4 whitespace-nowrap">{{ user.username }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">{{ user.name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">{{ user.email }}</td>
@@ -114,6 +137,9 @@
                                           :class="user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'">
                                         {{ user.role === 'admin' ? 'Administrador' : 'Usuário' }}
                                     </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ formatDate(user.created_at) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <button 
@@ -125,6 +151,8 @@
                                     <button 
                                         @click="confirmDeleteUser(user)"
                                         class="text-red-600 hover:text-red-900"
+                                        :disabled="user.role === 'admin'"
+                                        :class="{ 'opacity-50 cursor-not-allowed': user.role === 'admin' }"
                                     >
                                         Excluir
                                     </button>
@@ -132,6 +160,11 @@
                             </tr>
                         </tbody>
                     </table>
+
+                    <!-- Empty State -->
+                    <div v-if="filteredUsers.length === 0" class="text-center py-8 text-gray-600">
+                        Nenhum usuário encontrado
+                    </div>
                 </div>
             </div>
 
@@ -284,7 +317,7 @@
         </div>
 
         <!-- Add/Edit User Modal -->
-        <div v-if="showAddUserModal || showEditUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div v-if="showAddUserModal || showEditUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div class="bg-white rounded-lg p-6 max-w-md w-full">
                 <h3 class="text-lg font-bold mb-4">{{ showEditUserModal ? 'Editar Usuário' : 'Adicionar Novo Usuário' }}</h3>
                 <form @submit.prevent="saveUser" class="space-y-4">
@@ -364,7 +397,7 @@
         </div>
 
         <!-- Delete Confirmation Modal -->
-        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div class="bg-white rounded-lg p-6 max-w-md w-full">
                 <h3 class="text-lg font-bold mb-4">Confirmar Exclusão</h3>
                 <p class="text-gray-600 mb-6">
@@ -390,11 +423,21 @@
     </div>
 
     <script>
-        const { createClient } = supabase;
-        const supabaseClient = createClient(
-            'https://odjgklouyfsqhvxvmvdx.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
-        );
+        // Garantir que o Supabase está disponível
+        if (typeof supabase === 'undefined') {
+            console.error('Supabase não está carregado corretamente');
+        }
+
+        // Criar cliente Supabase com tratamento de erro
+        let supabaseClient;
+        try {
+            supabaseClient = supabase.createClient(
+                'https://odjgklouyfsqhvxvmvdx.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
+            );
+        } catch (error) {
+            console.error('Erro ao inicializar Supabase:', error);
+        }
 
         const { createApp } = Vue;
 
@@ -424,19 +467,28 @@
                         email: '',
                         password: '',
                         role: 'user'
-                    }
+                    },
+                    userSearch: '',
+                    userFilter: 'all'
                 }
             },
             computed: {
-                filteredCalculations() {
-                    let filtered = [...this.calculations];
+                filteredUsers() {
+                    let filtered = [...this.users];
                     
-                    if (this.selectedUser !== 'all') {
-                        filtered = filtered.filter(calc => calc.user_id === this.selectedUser);
+                    // Apply role filter
+                    if (this.userFilter !== 'all') {
+                        filtered = filtered.filter(user => user.role === this.userFilter);
                     }
                     
-                    if (this.calculationType !== 'all') {
-                        filtered = filtered.filter(calc => calc.type === this.calculationType);
+                    // Apply search filter
+                    if (this.userSearch.trim()) {
+                        const search = this.userSearch.toLowerCase().trim();
+                        filtered = filtered.filter(user => 
+                            user.username.toLowerCase().includes(search) ||
+                            user.name.toLowerCase().includes(search) ||
+                            user.email.toLowerCase().includes(search)
+                        );
                     }
                     
                     return filtered;
@@ -450,12 +502,25 @@
                     return;
                 }
 
-                await this.loadUsers();
-                await this.loadNews();
-                await this.loadCalculations();
+                // Carregar dados iniciais
+                await this.loadInitialData();
             },
             methods: {
+                async loadInitialData() {
+                    await this.loadUsers();
+                    
+                    if (this.activeTab === 'news') {
+                        await this.loadNews();
+                    } else if (this.activeTab === 'calculations') {
+                        await this.loadCalculations();
+                    }
+                },
                 async loadUsers() {
+                    if (!supabaseClient) {
+                        this.error = 'Erro de conexão com o servidor. Por favor, recarregue a página.';
+                        return;
+                    }
+
                     this.loading = true;
                     this.error = null;
 
@@ -466,7 +531,7 @@
                             .order('created_at', { ascending: false });
 
                         if (error) throw error;
-                        this.users = users;
+                        this.users = users || [];
                     } catch (error) {
                         console.error('Erro ao carregar usuários:', error);
                         this.error = 'Falha ao carregar a lista de usuários. Por favor, tente novamente.';
@@ -475,6 +540,11 @@
                     }
                 },
                 async loadNews() {
+                    if (!supabaseClient) {
+                        this.error = 'Erro de conexão com o servidor. Por favor, recarregue a página.';
+                        return;
+                    }
+
                     try {
                         const { data: news, error } = await supabaseClient
                             .from('news')
@@ -482,12 +552,17 @@
                             .order('created_at', { ascending: false });
 
                         if (error) throw error;
-                        this.news = news;
+                        this.news = news || [];
                     } catch (error) {
                         console.error('Erro ao carregar notícias:', error);
                     }
                 },
                 async loadCalculations() {
+                    if (!supabaseClient) {
+                        this.error = 'Erro de conexão com o servidor. Por favor, recarregue a página.';
+                        return;
+                    }
+
                     this.loadingCalculations = true;
                     this.calculationsError = null;
                     
@@ -498,7 +573,7 @@
                             .order('created_at', { ascending: false });
 
                         if (error) throw error;
-                        this.calculations = calculations;
+                        this.calculations = calculations || [];
                     } catch (error) {
                         console.error('Erro ao carregar cálculos:', error);
                         this.calculationsError = 'Falha ao carregar histórico de cálculos';
@@ -506,16 +581,22 @@
                         this.loadingCalculations = false;
                     }
                 },
+                filterUsers() {
+                    // Computed property handles the filtering
+                },
                 editUser(user) {
                     this.formData = { ...user, password: '' };
                     this.showEditUserModal = true;
                 },
                 confirmDeleteUser(user) {
+                    if (user.role === 'admin') {
+                        return;
+                    }
                     this.userToDelete = user;
                     this.showDeleteModal = true;
                 },
                 async deleteUser() {
-                    if (!this.userToDelete) return;
+                    if (!this.userToDelete || this.userToDelete.role === 'admin') return;
 
                     this.deleteLoading = true;
                     try {
@@ -595,50 +676,8 @@
                     };
                     this.formError = null;
                 },
-                async deleteCalculation(calc) {
-                    if (!confirm('Tem certeza que deseja excluir este cálculo?')) {
-                        return;
-                    }
-
-                    try {
-                        const { error } = await supabaseClient
-                            .from('calculations')
-                            .delete()
-                            .eq('id', calc.id);
-
-                        if (error) throw error;
-                        await this.loadCalculations();
-                    } catch (error) {
-                        console.error('Erro ao excluir cálculo:', error);
-                        alert('Falha ao excluir cálculo');
-                    }
-                },
-                getUserName(userId) {
-                    const user = this.users.find(u => u.id === userId);
-                    return user ? user.username : 'Usuário Desconhecido';
-                },
-                formatCurrency(value) {
-                    return Number(value).toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                },
                 formatDate(date) {
-                    return new Date(date).toLocaleDateString('pt-BR', {
+                    return new Date(date).toLocaleString('pt-BR', {
                         day: '2-digit',
                         month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                },
-                logout() {
-                    localStorage.removeItem('isLoggedIn');
-                    localStorage.removeItem('currentUser');
-                    window.location.href = '/login.html';
-                }
-            }
-        }).mount('#app')
-    </script>
-</body>
-</html>
+                        year: '

@@ -6,6 +6,7 @@
     <title>Painel Administrativo</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
     <div id="app" class="container mx-auto px-4 py-8">
@@ -540,8 +541,12 @@
         </div>
     </div>
 
-    <script type="module">
-        import db from '/src/lib/db.js';
+    <script>
+        // Initialize Supabase client
+        const supabaseClient = supabase.createClient(
+            'https://odjgklouyfsqhvxvmvdx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
+        );
 
         const { createApp } = Vue;
 
@@ -607,6 +612,7 @@
             },
             computed: {
                 filteredUsers() {
+                    let filtered = [... ```javascript
                     let filtered = [...this.users];
                     
                     if (this.userFilter !== 'all') {
@@ -631,7 +637,7 @@
                         filtered = filtered.filter(calc => calc.user_id === this.calculationsFilter.userId);
                     }
                     
-                    if (this.calculationsFilter.type !== 'all ') {
+                    if (this.calculationsFilter.type !== 'all') {
                         filtered = filtered.filter(calc => calc.type === this.calculationsFilter.type);
                     }
                     
@@ -644,6 +650,20 @@
                 if (currentUser.role !== 'admin') {
                     window.location.href = '/login.html';
                     return;
+                }
+
+                // Initialize Supabase session
+                const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+                if (!session) {
+                    const { data: { user }, error: signInError } = await supabaseClient.auth.signInWithPassword({
+                        email: 'contato@dinoraw.com.br',
+                        password: 'dino24413'
+                    });
+
+                    if (signInError) {
+                        console.error('Erro ao autenticar:', signInError);
+                        return;
+                    }
                 }
 
                 await this.loadInitialData();
@@ -661,7 +681,13 @@
                     this.error = null;
 
                     try {
-                        this.users = await db.getUsers();
+                        const { data: users, error } = await supabaseClient
+                            .from('profiles')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.users = users || [];
                     } catch (error) {
                         console.error('Erro ao carregar usuários:', error);
                         this.error = 'Falha ao carregar a lista de usuários. Por favor, tente novamente.';
@@ -674,9 +700,13 @@
                     this.newsError = null;
 
                     try {
-                        this.news = await db.getNews();
-                        // Sort by creation date, newest first
-                        this.news.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                        const { data: news, error } = await supabaseClient
+                            .from('news')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.news = news || [];
                     } catch (error) {
                         console.error('Erro ao carregar notícias:', error);
                         this.newsError = 'Falha ao carregar notícias';
@@ -689,9 +719,13 @@
                     this.calculationsError = null;
                     
                     try {
-                        this.calculations = await db.getCalculations();
-                        // Sort by creation date, newest first
-                        this.calculations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                        const { data: calculations, error } = await supabaseClient
+                            .from('calculations')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        this.calculations = calculations || [];
                     } catch (error) {
                         console.error('Erro ao carregar cálculos:', error);
                         this.calculationsError = 'Falha ao carregar histórico de cálculos';
@@ -713,7 +747,13 @@
 
                     this.deleteUserLoading = true;
                     try {
-                        await db.deleteUser(this.userToDelete.id);
+                        const { error } = await supabaseClient
+                            .from('profiles')
+                            .delete()
+                            .eq('id', this.userToDelete.id);
+
+                        if (error) throw error;
+                        
                         await this.loadUsers();
                         this.showDeleteUserModal = false;
                         this.userToDelete = null;
@@ -730,9 +770,34 @@
 
                     try {
                         if (this.showEditUserModal) {
-                            await db.updateUser(this.userForm.id, this.userForm);
+                            const updateData = {
+                                username: this.userForm.username,
+                                name: this.userForm.name,
+                                email: this.userForm.email,
+                                role: this.userForm.role,
+                                updated_at: new Date().toISOString()
+                            };
+
+                            const { error } = await supabaseClient
+                                .from('profiles')
+                                .update(updateData)
+                                .eq('id', this.userForm.id);
+
+                            if (error) throw error;
                         } else {
-                            await db.createUser(this.userForm);
+                            const { data: { user }, error: signUpError } = await supabaseClient.auth.signUp({
+                                email: this.userForm.email,
+                                password: this.userForm.password,
+                                options: {
+                                    data: {
+                                        username: this.userForm.username,
+                                        name: this.userForm.name,
+                                        role: this.userForm.role
+                                    }
+                                }
+                            });
+
+                            if (signUpError) throw signUpError;
                         }
 
                         await this.loadUsers();
@@ -757,7 +822,13 @@
 
                     this.deleteNewsLoading = true;
                     try {
-                        await db.deleteNews(this.newsToDelete.id);
+                        const { error } = await supabaseClient
+                            .from('news')
+                            .delete()
+                            .eq('id', this.newsToDelete.id);
+
+                        if (error) throw error;
+                        
                         await this.loadNews();
                         this.showDeleteNewsModal = false;
                         this.newsToDelete = null;
@@ -773,10 +844,26 @@
                     this.newsFormError = null;
 
                     try {
+                        const newsData = {
+                            title: this.newsForm.title,
+                            content: this.newsForm.content,
+                            image: this.newsForm.image || null,
+                            video: this.newsForm.video || null
+                        };
+
                         if (this.showEditNewsModal) {
-                            await db.updateNews(this.newsForm.id, this.newsForm);
+                            const { error } = await supabaseClient
+                                .from('news')
+                                .update(newsData)
+                                .eq('id', this.newsForm.id);
+
+                            if (error) throw error;
                         } else {
-                            await db.createNews(this.newsForm);
+                            const { error } = await supabaseClient
+                                .from('news')
+                                .insert([newsData]);
+
+                            if (error) throw error;
                         }
 
                         await this.loadNews();
@@ -797,7 +884,13 @@
 
                     this.deleteCalculationLoading = true;
                     try {
-                        await db.deleteCalculation(this.calculationToDelete.id);
+                        const { error } = await supabaseClient
+                            .from('calculations')
+                            .delete()
+                            .eq('id', this.calculationToDelete.id);
+
+                        if (error) throw error;
+                        
                         await this.loadCalculations();
                         this.showDeleteCalculationModal = false;
                         this.calculationToDelete = null;
@@ -853,10 +946,15 @@
                     const user = this.users.find(u => u.id === userId);
                     return user ? user.username : 'Usuário Desconhecido';
                 },
-                logout() {
-                    localStorage.removeItem('isLoggedIn');
-                    localStorage.removeItem('currentUser');
-                    window.location.href = '/login.html';
+                async logout() {
+                    try {
+                        await supabaseClient.auth.signOut();
+                        localStorage.removeItem('isLoggedIn');
+                        localStorage.removeItem('currentUser');
+                        window.location.href = '/login.html';
+                    } catch (error) {
+                        console.error('Erro ao fazer logout:', error);
+                    }
                 }
             }
         }).mount('#app')

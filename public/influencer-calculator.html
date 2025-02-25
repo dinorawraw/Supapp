@@ -48,7 +48,7 @@
         }
     </style>
 </head>
-<body class="min-h-screen bg-[conic-gradient(at_top_right,_#04456c,_#04456c,_#391334,_#043d59,_#04244c)] antialiased">
+<body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
     <!-- Header with Navigation and Profile -->
     <div class="fixed top-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 shadow-lg z-50">
         <div class="container mx-auto flex justify-between items-center">
@@ -288,14 +288,10 @@
         </div>
     </div>
 
-    <script>
-        function logout() {
-            localStorage.removeItem('isLoggedIn');
-            localStorage.removeItem('currentUser');
-            window.location.href = '/login.html';
-        }
+    <script type="module">
+        import db from '/src/lib/db.js';
 
-        const { createApp } = Vue
+        const { createApp } = Vue;
 
         createApp({
             data() {
@@ -384,17 +380,12 @@
                             }
                         };
 
-                        const { error } = await supabaseClient
-                            .from('calculations')
-                            .insert([calculationData]);
-
-                        if (error) throw error;
+                        await db.createCalculation(calculationData);
                         
                         this.lastSavedAt = new Date().toLocaleTimeString();
                         this.showSaveDialog = false;
                         this.saveName = '';
                         
-                        // Atualizar histórico local
                         await this.loadHistory();
                     } catch (error) {
                         console.error('Erro ao salvar cálculo:', error);
@@ -407,16 +398,11 @@
                 async loadHistory() {
                     try {
                         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-                        const { data: calculations, error } = await supabaseClient
-                            .from('calculations')
-                            .select('*')
-                            .eq('user_id', currentUser.id)
-                            .eq('type', 'instagram')
-                            .order('created_at', { ascending: false })
-                            .limit(5);
-
-                        if (error) throw error;
-                        this.history = calculations;
+                        const calculations = await db.getCalculationsByUser(currentUser.id);
+                        this.history = calculations
+                            .filter(calc => calc.type === 'instagram')
+                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                            .slice(0, 5);
                     } catch (error) {
                         console.error('Erro ao carregar histórico:', error);
                     }

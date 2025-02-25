@@ -6,8 +6,6 @@
     <title>Início</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Atualizado para versão específica e estável do Supabase -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
     <div id="app" class="container mx-auto px-4 py-8">
@@ -84,22 +82,8 @@
         </div>
     </div>
 
-    <script>
-        // Garantir que o Supabase está disponível
-        if (typeof supabase === 'undefined') {
-            console.error('Supabase não está carregado corretamente');
-        }
-
-        // Criar cliente Supabase com tratamento de erro
-        let supabaseClient;
-        try {
-            supabaseClient = supabase.createClient(
-                'https://odjgklouyfsqhvxvmvdx.supabase.co',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
-            );
-        } catch (error) {
-            console.error('Erro ao inicializar Supabase:', error);
-        }
+    <script type="module">
+        import db from '/src/lib/db.js';
 
         const { createApp } = Vue;
 
@@ -136,22 +120,13 @@
             },
             methods: {
                 async loadNews() {
-                    if (!supabaseClient) {
-                        this.error = 'Erro de conexão com o servidor. Por favor, recarregue a página.';
-                        return;
-                    }
-
                     this.loading = true;
                     this.error = null;
 
                     try {
-                        const { data: news, error } = await supabaseClient
-                            .from('news')
-                            .select('*')
-                            .order('created_at', { ascending: false });
-
-                        if (error) throw error;
-                        this.news = news || [];
+                        this.news = await db.getNews();
+                        // Sort news by creation date, newest first
+                        this.news.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                     } catch (error) {
                         console.error('Erro ao carregar notícias:', error);
                         this.error = 'Falha ao carregar as notícias. Por favor, tente novamente.';

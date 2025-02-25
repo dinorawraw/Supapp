@@ -97,8 +97,10 @@
         </div>
     </div>
 
-    <script>
-        const { createApp } = Vue
+    <script type="module">
+        import db from '/src/lib/db.js';
+
+        const { createApp } = Vue;
 
         createApp({
             data() {
@@ -115,13 +117,11 @@
                 }
             },
             mounted() {
-                // Check authentication
                 if (!localStorage.getItem('isLoggedIn')) {
                     window.location.href = '/login.html';
                     return;
                 }
 
-                // Load user data
                 try {
                     const userData = JSON.parse(localStorage.getItem('currentUser'));
                     this.profile = { ...userData };
@@ -137,25 +137,14 @@
                     this.success = '';
 
                     try {
-                        const users = JSON.parse(localStorage.getItem('users') || '[]');
-                        const userIndex = users.findIndex(u => u.username === this.profile.username);
+                        const updatedProfile = await db.updateUser(this.profile.id, {
+                            ...this.profile,
+                            password: this.newPassword || undefined
+                        });
 
-                        if (userIndex >= 0) {
-                            // Update user data
-                            users[userIndex] = {
-                                ...users[userIndex],
-                                ...this.profile,
-                                password: this.newPassword || users[userIndex].password
-                            };
-
-                            localStorage.setItem('users', JSON.stringify(users));
-                            localStorage.setItem('currentUser', JSON.stringify(this.profile));
-                            
-                            this.success = 'Perfil atualizado com sucesso';
-                            this.newPassword = '';
-                        } else {
-                            this.error = 'Usuário não encontrado';
-                        }
+                        localStorage.setItem('currentUser', JSON.stringify(updatedProfile));
+                        this.success = 'Perfil atualizado com sucesso';
+                        this.newPassword = '';
                     } catch (error) {
                         console.error('Erro ao salvar perfil:', error);
                         this.error = 'Falha ao salvar alterações do perfil';

@@ -6,7 +6,6 @@
     <title>Entrar</title>
     <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c] flex items-center justify-center p-4">
     <div id="app" class="w-full max-w-md">
@@ -71,12 +70,8 @@
         </div>
     </div>
 
-    <script>
-        const { createClient } = supabase;
-        const supabaseClient = createClient(
-            'https://odjgklouyfsqhvxvmvdx.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kamdrbG91eWZzcWh2eHZtdmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2MDEwODEsImV4cCI6MjA1NDE3NzA4MX0.uFHaIkfyDYeI8CxnDZ7klT-katJTWFyRCUsNmRkR7a0'
-        );
+    <script type="module">
+        import db from '/src/lib/db.js';
 
         const { createApp } = Vue;
 
@@ -91,21 +86,12 @@
             },
             mounted() {
                 // Check if already logged in
-                const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
                 if (localStorage.getItem('isLoggedIn')) {
+                    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
                     window.location.href = currentUser.role === 'admin' ? '/admin-panel.html' : '/home.html';
                 }
             },
             methods: {
-                handleErrorMessage(error) {
-                    if (error.message === 'Senha incorreta') {
-                        return 'Senha incorreta';
-                    }
-                    if (error.code === 'invalid_credentials') {
-                        return 'E-mail ou senha inválidos';
-                    }
-                    return 'Erro ao fazer login. Por favor, tente novamente.';
-                },
                 async handleLogin() {
                     if (!this.email || !this.password) {
                         this.error = 'Por favor, preencha todos os campos';
@@ -117,47 +103,33 @@
 
                     try {
                         // Admin login
-                        if (this.email === 'contato@dinoraw.com.br') {
-                            if (this.password === 'dino24413') {
-                                const adminUser = {
-                                    username: 'DinoRaw',
-                                    name: 'Admin DinoRaw',
-                                    email: this.email,
-                                    role: 'admin'
-                                };
-                                localStorage.setItem('isLoggedIn', 'true');
-                                localStorage.setItem('currentUser', JSON.stringify(adminUser));
-                                window.location.href = '/admin-panel.html';
-                                return;
-                            }
-                            throw new Error('Senha incorreta');
+                        if (this.email === 'contato@dinoraw.com.br' && this.password === 'dino24413') {
+                            const adminUser = {
+                                id: 'admin-1',
+                                username: 'DinoRaw',
+                                name: 'Admin DinoRaw',
+                                email: this.email,
+                                role: 'admin'
+                            };
+                            localStorage.setItem('isLoggedIn', 'true');
+                            localStorage.setItem('currentUser', JSON.stringify(adminUser));
+                            window.location.href = '/admin-panel.html';
+                            return;
                         }
 
                         // Regular user login
-                        const { data, error: signInError } = await supabaseClient.auth.signInWithPassword({
-                            email: this.email,
-                            password: this.password
-                        });
-
-                        if (signInError) throw signInError;
-
-                        const { data: profile, error: profileError } = await supabaseClient
-                            .from('profiles')
-                            .select('*')
-                            .eq('id', data.user.id)
-                            .single();
-
-                        if (profileError) {
-                            throw new Error('Erro ao carregar perfil do usuário');
-                        }
-
-                        if (!profile) {
-                            throw new Error('Perfil não encontrado');
+                        const user = await db.getUserByEmail(this.email);
+                        
+                        if (!user || user.password !== this.password) {
+                            throw new Error('Invalid login credentials');
                         }
 
                         const userData = {
-                            ...profile,
-                            role: profile.role || 'user'
+                            id: user.id,
+                            username: user.username,
+                            name: user.name,
+                            email: user.email,
+                            role: user.role || 'user'
                         };
 
                         localStorage.setItem('isLoggedIn', 'true');
@@ -165,7 +137,8 @@
                         window.location.href = '/home.html';
 
                     } catch (error) {
-                        this.error = this.handleErrorMessage(error);
+                        console.error('Erro de login:', error);
+                        this.error = 'Email ou senha incorretos';
                     } finally {
                         this.loading = false;
                     }

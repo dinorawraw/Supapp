@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Início</title>
+    <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#04456c] via-[#391334] to-[#04244c]">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-white">Bem-vindo(a), {{ user?.name || 'Usuário' }}!</h1>
+            <div class="flex gap-4">
+                <button 
+                    @click="goToProfile"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    Perfil
+                </button>
+                <button 
+                    @click="logout"
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                    Sair
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Menu -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div 
+                @click="goToCalculator"
+                class="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 text-white cursor-pointer hover:opacity-90 transition-all shadow-lg"
+            >
+                <h2 class="text-2xl font-bold mb-2">Calculadora de Publis</h2>
+                <p class="text-white/80">Calcule valores para suas publicações no Instagram e TikTok</p>
+            </div>
+
+            <div 
+                @click="goToStreamTools"
+                class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white cursor-pointer hover:opacity-90 transition-all shadow-lg"
+            >
+                <h2 class="text-2xl font-bold mb-2">Ferramentas para Stream</h2>
+                <p class="text-white/80">Acesse ferramentas úteis para suas transmissões</p>
+            </div>
+        </div>
+
+        <!-- News Section -->
+        <div class="bg-white/10 backdrop-blur-sm rounded-xl p-6">
+            <h2 class="text-2xl font-bold text-white mb-4">Últimas Novidades</h2>
+            <div v-if="loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent"></div>
+                <p class="mt-2 text-white/80">Carregando novidades...</p>
+            </div>
+            <div v-else-if="error" class="text-center py-8">
+                <p class="text-red-400">{{ error }}</p>
+                <button 
+                    @click="loadNews" 
+                    class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    Tentar Novamente
+                </button>
+            </div>
+            <div v-else-if="news.length === 0" class="text-center py-8">
+                <p class="text-white/80">Nenhuma novidade disponível no momento.</p>
+            </div>
+            <div v-else class="space-y-4">
+                <div v-for="item in news" :key="item.id" class="bg-white/5 rounded-lg p-4">
+                    <h3 class="text-xl font-bold text-white mb-2">{{ item.title }}</h3>
+                    <p class="text-white/80">{{ item.content }}</p>
+                    <img v-if="item.image" :src="item.image" :alt="item.title" class="mt-4 rounded-lg max-h-48 w-auto">
+                    <video v-if="item.video" controls class="mt-4 rounded-lg max-h-48 w-auto">
+                        <source :src="item.video" type="video/mp4">
+                    </video>
+                    <p class="text-sm text-white/60 mt-2">
+                        {{ new Date(item.created_at).toLocaleDateString('pt-BR') }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import db from '/src/lib/db.js';
+
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    user: null,
+                    news: [],
+                    loading: false,
+                    error: null
+                }
+            },
+            async mounted() {
+                // Check authentication
+                if (!localStorage.getItem('isLoggedIn')) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                // Get user data
+                try {
+                    this.user = JSON.parse(localStorage.getItem('currentUser'));
+                    if (!this.user) {
+                        throw new Error('Usuário não encontrado');
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar usuário:', error);
+                    this.logout();
+                    return;
+                }
+
+                // Load news
+                await this.loadNews();
+            },
+            methods: {
+                async loadNews() {
+                    this.loading = true;
+                    this.error = null;
+
+                    try {
+                        this.news = await db.getNews();
+                        // Sort news by creation date, newest first
+                        this.news.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    } catch (error) {
+                        console.error('Erro ao carregar notícias:', error);
+                        this.error = 'Falha ao carregar as notícias. Por favor, tente novamente.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                goToCalculator() {
+                    window.location.href = '/index.html';
+                },
+                goToStreamTools() {
+                    window.location.href = '/stream-tools.html';
+                },
+                goToProfile() {
+                    window.location.href = '/profile.html';
+                },
+                logout() {
+                    localStorage.removeItem('isLoggedIn');
+                    localStorage.removeItem('currentUser');
+                    window.location.href = '/login.html';
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

@@ -75,9 +75,8 @@
         </div>
     </div>
 
-    <script type="module">
-        import db from './src/lib/db.js';
-
+    <script src="./lib/db.js"></script>
+    <script>
         const { createApp } = Vue;
 
         createApp({
@@ -103,7 +102,7 @@
             methods: {
                 async testDatabase() {
                     try {
-                        await db.ready;
+                        await window.db.ready;
                     } catch (error) {
                         console.error('Erro ao conectar ao banco de dados:', error);
                         this.dbError = true;
@@ -135,7 +134,7 @@
                         }
 
                         // Regular user login
-                        const user = await db.getUserByEmail(this.email);
+                        const user = await window.db.getUserByEmail(this.email);
                         
                         if (!user || user.password !== this.password) {
                             throw new Error('Invalid login credentials');

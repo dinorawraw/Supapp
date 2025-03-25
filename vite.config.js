@@ -23,5 +23,13 @@ export default defineConfig({
     }
   },
   publicDir: 'public',
-  base: './'
+  base: './',
+  server: {
+    fs: {
+      strict: false
+    }
+  },
+  optimizeDeps: {
+    exclude: ['db.js']
+  }
 });
